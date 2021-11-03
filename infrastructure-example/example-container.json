@@ -1,0 +1,75 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "value": "westus2"
+        },
+        "imageName": {
+            "value": "YOUR_DOCKER_IMAGE"
+        },
+        "osType": {
+            "value": "Linux"
+        },
+        "numberCpuCores": {
+            "value": "1"
+        },
+        "memory": {
+            "value": "2"
+        },
+        "restartPolicy": {
+            "value": "Always"
+        },
+        "environmentVariables": {
+            "value": [
+                {
+                    "name": "AZURE_VAULT_NAME",
+                    "value": "REDACTED"
+                },
+                {
+                    "name": "AZURE_KEY_NAME",
+                    "value": "REDACTED"
+                },
+                {
+                    "name": "STABLE_TOKEN",
+                    "value": "cUSD"
+                },
+                {
+                    "name": "CELO_PROVIDER",
+                    "value": "https://forno.celo.org"
+                },
+                {
+                    "name": "EXCHANGE_SECS",
+                    "value": "15"
+                },
+                {
+                    "name": "TRANSFER_SECS",
+                    "value": "7200"
+                },
+                {
+                    "name": "EXCHANGE_AMOUNT_CELO",
+                    "value": "1e18"
+                },
+                {
+                    "name": "EXCHANGE_MAX_ALLOWED_SLIPPAGE",
+                    "value": "0.01"
+                },
+                {
+                    "name": "EXCHANGE_MINRATE_STABLETOKEN_PER_CELO",
+                    "value": "3.0"
+                },
+                {
+                    "name": "EXCHANGE_SOURCE_ADDRESS",
+                    "value": "0xREDACTED"
+                },
+                {
+                    "name": "EXCHANGE_TARGET_ADDRESS",
+                    "value": "0xREDACTED"
+                }
+            ]
+        },
+        "userAssignedIdentity": {
+          "value": "/subscriptions/REDACTED/resourcegroups/REDACTED/providers/Microsoft.ManagedIdentity/userAssignedIdentities/REDACTED"
+        }
+    }
+}

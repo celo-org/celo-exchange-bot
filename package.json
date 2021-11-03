@@ -1,0 +1,45 @@
+{
+  "name": "@celo/exchanger",
+  "version": "0.0.1",
+  "description": "To exchange CELO and cUSD regularly",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "author": "Celo",
+  "license": "Apache-2.0",
+  "homepage": "",
+  "repository": "",
+  "keywords": [
+    "celo",
+    "blockchain"
+  ],
+  "scripts": {
+    "build": "tsc -b .",
+    "clean": "tsc -b . --clean",
+    "clean:all": "yarn clean && rm -rf lib",
+    "prepublishOnly": "yarn build:gen && yarn build",
+    "start-ts": "TS_NODE_FILES=true ts-node src/index.ts",
+    "start": "node lib/index.js",
+    "dev": "CONFIG=config/.env.development nodemon",
+    "lint": "tslint -c tslint.json --project ."
+  },
+  "dependencies": {
+    "@celo/contractkit": "^1.2.0",
+    "@celo/wallet-hsm-azure": "^1.2.0",
+    "bignumber.js": "^9.0.0",
+    "bunyan": "1.8.12",
+    "debug": "^4.1.1",
+    "dotenv": "8.0.0",
+    "web3": "1.2.4"
+  },
+  "devDependencies": {
+    "@types/bunyan": "1.8.4",
+    "@types/debug": "^4.1.5",
+    "@types/dotenv": "4.0.3",
+    "@types/ethereumjs-util": "^5.2.0",
+    "nodemon": "1.19.1",
+    "ts-node": "8.3.0"
+  },
+  "engines": {
+    "node": ">=8.13.0"
+  }
+}

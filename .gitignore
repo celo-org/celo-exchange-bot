@@ -1,0 +1,10 @@
+src/generated
+lib/
+.devchain
+db
+node_modules
+.DS_Store
+*.log
+config/.env.development
+tsconfig.tsbuildinfo
+.idea/
