@@ -1,4 +1,4 @@
-import { EnvVar, fetchEnv, fetchEnvBigNumber, fetchEnvBigNumberOrDefault, fetchEnvOrDefault, getSourceAddress, getTargetAddress, getStableToken } from './env'
+import { EnvVar, fetchEnv, fetchEnvBigNumber, fetchEnvBigNumberOrDefault, fetchEnvOrDefault, getSourceAddress, getTargetAddress, getStableToken, fetchEnvBool } from './env'
 import { rootLogger } from './logger'
 import { ContractKit, newKit } from '@celo/contractkit'
 import { AzureHSMWallet } from '@celo/wallet-hsm-azure'
@@ -51,28 +51,55 @@ async function initializeKit() {
 async function exchange() {
   try {
     const stableToken = getStableToken()
+    const stableTokenInstance = await kit.contracts.getStableToken(stableToken)
     const sourceAddress = getSourceAddress()
-    const sellMinRateStableTokenPerCELO = fetchEnvBigNumber(EnvVar.EXCHANGE_MINRATE_STABLETOKEN_PER_CELO)
     const mentoInstance = await kit.contracts.getExchange(stableToken)
     const celoTokenInstance = await kit.contracts.getGoldToken()
+    
+    
+    const sellCELO = fetchEnvBool(EnvVar.EXCHANGE_SELL_CELO)
+    
+    let soldableAsset, buyableAsset, sellMinRateStableTokenPerCELO
+    let amountToSell:BigNumber
+    
+    if (sellCELO){
+      soldableAsset = await celoTokenInstance
+      buyableAsset = await stableTokenInstance
+      amountToSell = fetchEnvBigNumber(EnvVar.EXCHANGE_AMOUNT_CELO)
+      sellMinRateStableTokenPerCELO = fetchEnvBigNumber(EnvVar.EXCHANGE_MINRATE_STABLETOKEN_PER_CELO) // sellMinRateStableTokenPerCELO
+    } else {
+      soldableAsset = await stableTokenInstance
+      buyableAsset = await celoTokenInstance
+      amountToSell = fetchEnvBigNumber(EnvVar.EXCHANGE_AMOUNT_STABLE)
+      sellMinRateStableTokenPerCELO = (new BigNumber(1)).div(fetchEnvBigNumber(EnvVar.EXCHANGE_MINRATE_STABLETOKEN_PER_CELO))
+      
+    }
+
 
     // Check how much we can buy (always keep 1CG for gas).
-    const realBalanceCELO = await celoTokenInstance.balanceOf(sourceAddress)
-    const availableBalanceCELO = realBalanceCELO.minus(new BigNumber('1e18'))
-    if (availableBalanceCELO.lt(new BigNumber(0))) {
-      rootLogger.warn({ realBalanceCELO, availableBalanceCELO }, "Insufficient available balance to exchange")
+    // For stable assets this is not required, but changing it would involve require a big refactor
+    const availableBalance = (await soldableAsset.balanceOf(sourceAddress)).minus(new BigNumber('1e18'))
+    if (availableBalance.lt(new BigNumber(0))) {
+      rootLogger.warn({ soldableAsset, availableBalance }, "Insufficient available balance to exchange")
       return
     }
 
-    let sellAmountCELO = BigNumber.min(availableBalanceCELO, fetchEnvBigNumber(EnvVar.EXCHANGE_AMOUNT_CELO))
+    let sellAmount = BigNumber.min(availableBalance, amountToSell)
+
 
     // Figure out the minimum stableToken we want to acquire for that.
-    const forAtLeastStableToken = sellAmountCELO.multipliedBy(sellMinRateStableTokenPerCELO).integerValue(BigNumber.ROUND_FLOOR)
+    const forAtLeastStableToken = sellAmount.multipliedBy(sellMinRateStableTokenPerCELO).integerValue(BigNumber.ROUND_FLOOR)
 
-    const quotedRate = new BigNumber(1).div(await mentoInstance.getGoldExchangeRate(sellAmountCELO))
+    let quotedRate
+    if (sellCELO){
+      quotedRate = new BigNumber(1).div(await mentoInstance.getGoldExchangeRate(sellAmount))
+    } else {
+      quotedRate = new BigNumber(1).div(await mentoInstance.getStableExchangeRate(sellAmount))
+    }
+
     if (quotedRate.lt(sellMinRateStableTokenPerCELO)) {
       rootLogger.info({
-        sellAmountCELO,
+        sellAmount,
         forAtLeastStableToken,
         quotedRate,
       }, "Quoted rate too low to exchange")
@@ -80,11 +107,11 @@ async function exchange() {
     }
 
     // Increase allowance
-    const allowanceReceipt = await celoTokenInstance.increaseAllowance(mentoInstance.address, sellAmountCELO.toFixed()).sendAndWaitForReceipt()
+    const allowanceReceipt = await soldableAsset.increaseAllowance(mentoInstance.address, sellAmount.toFixed()).sendAndWaitForReceipt()
     rootLogger.debug({
       allowanceReceipt,
       target: mentoInstance.address,
-      allowanceIncreaseAmount: sellAmountCELO,
+      allowanceIncreaseAmount: sellAmount,
     }, "Increased CELO token allowance to Mento")
 
     // To do our best to prevent sandwich attacks, prefer to set the min stable token out amount
@@ -97,22 +124,23 @@ async function exchange() {
     //   10 * 4.00 // 40.0
     // ) = 49.5
     const minStableTokenOut = BigNumber.max(
-      sellAmountCELO.multipliedBy(
+      sellAmount.multipliedBy(
         quotedRate.multipliedBy(new BigNumber(1).minus(maxAllowedSlippage))
       ).integerValue(BigNumber.ROUND_FLOOR),
       forAtLeastStableToken
     )
+    
 
     // Exchange
-    const exchangeReceipt = await mentoInstance.exchange(sellAmountCELO.toFixed(), minStableTokenOut.toFixed(), true).sendAndWaitForReceipt()
+    const exchangeReceipt = await mentoInstance.exchange(sellAmount.toFixed(), minStableTokenOut.toFixed(), sellCELO).sendAndWaitForReceipt()
     const sourceBalanceCELO = await celoTokenInstance.balanceOf(sourceAddress)
     rootLogger.info({
       exchangeReceipt,
       sourceBalanceCELO,
-      sellAmountCELO,
+      sellAmount,
       minStableTokenOut,
       quotedRate
-    }, `Exchange (CELO for ${stableToken}) succeeded`)
+    }, `Exchange (${soldableAsset} for ${buyableAsset}) succeeded`)
   } catch (err) {
     rootLogger.error({ err }, "This exchange failed")
   }
@@ -120,23 +148,32 @@ async function exchange() {
 
 async function transfer() {
   try {
-    const stableToken = getStableToken()
-    const stableTokenInstace = await kit.contracts.getStableToken(stableToken)
+    const sellCELO = fetchEnvBool(EnvVar.EXCHANGE_SELL_CELO)
+    let transferableToken
+    if (sellCELO){
+      const stableToken = getStableToken()
+      const stableTokenInstace = await kit.contracts.getStableToken(stableToken)
+      transferableToken = stableTokenInstace
+    } else {
+      transferableToken = await kit.contracts.getGoldToken()
+    }
+
+
 
     const sourceAddress = getSourceAddress()
-    const sourceStableTokenBalance = await stableTokenInstace.balanceOf(sourceAddress)
+    const sourceStableTokenBalance = await transferableToken.balanceOf(sourceAddress)
     const targetAddress = getTargetAddress()
 
     if (sourceStableTokenBalance.gt(MIN_STABLE_TOKEN_TRANSFER_AMOUNT)) {
       rootLogger.info({
-        stableToken,
+        transferableToken,
         sourceStableTokenBalance,
         sourceAddress,
         targetAddress,
-      }, 'Transferring entire stable token balance from source to target')
+      }, `Transferring entire balance of ${transferableToken} from source to target`)
 
-      const transferReceipt = await stableTokenInstace.transfer(targetAddress, sourceStableTokenBalance.toFixed()).sendAndWaitForReceipt()
-      const targetStableTokenBalance = await stableTokenInstace.balanceOf(targetAddress)
+      const transferReceipt = await transferableToken.transfer(targetAddress, sourceStableTokenBalance.toFixed()).sendAndWaitForReceipt()
+      const targetStableTokenBalance = await transferableToken.balanceOf(targetAddress)
       rootLogger.info({
         transferReceipt,
         targetStableTokenBalance
