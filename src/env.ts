@@ -12,8 +12,10 @@ export enum EnvVar {
   EXCHANGE_MAX_ALLOWED_SLIPPAGE = 'EXCHANGE_MAX_ALLOWED_SLIPPAGE',
   EXCHANGE_MINRATE_STABLETOKEN_PER_CELO = 'EXCHANGE_MINRATE_STABLETOKEN_PER_CELO',
   EXCHANGE_SECS = 'EXCHANGE_SECS',
+  EXCHANGE_SELL_CELO = 'EXCHANGE_SELL_CELO',
   EXCHANGE_SOURCE_ADDRESS = 'EXCHANGE_SOURCE_ADDRESS',
   EXCHANGE_TARGET_ADDRESS = 'EXCHANGE_TARGET_ADDRESS',
+  EXCHANGE_AMOUNT_STABLE = 'EXCHANGE_AMOUNT_STABLE',
   STABLE_TOKEN = 'STABLE_TOKEN',
   TRANSFER_SECS = 'TRANSFER_SECS',
 }
@@ -33,6 +35,15 @@ export function fetchEnvOrDefault(name: string, defaultValue: string): string {
   return process.env[name] === undefined || process.env[name] === ''
     ? defaultValue
     : (process.env[name] as string)
+}
+
+export function fetchEnvBool(name: string): boolean {
+  if (process.env[name] === "true") {
+    return true
+  } else if (process.env[name] === "false") {
+    return false
+  }
+  throw `Bool variable ${name} is in the wrong format`
 }
 
 export function fetchEnvAddress(name: string): string {
