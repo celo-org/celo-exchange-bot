@@ -76,10 +76,10 @@ async function exchange() {
     }
 
 
-    // Check how much we can buy (always keep 1CG for gas).
-    // For stable assets this is not required, but changing it would involve require a big refactor
-    const availableBalance = (await soldableAsset.balanceOf(sourceAddress)).minus(new BigNumber('1e18'))
-    if (availableBalance.lt(new BigNumber(0))) {
+    // Check how much we can exchange (keep 1 CELO for gas if selling CELO for stable (minting)).
+    const amountToKeep = sellCELO ? new BigNumber('1e18') : new BigNumber('0')
+    const availableBalance = (await soldableAsset.balanceOf(sourceAddress)).minus(amountToKeep)
+    if (availableBalance.lte(new BigNumber(0))) {
       rootLogger.warn({ soldableAsset, availableBalance }, "Insufficient available balance to exchange")
       return
     }
