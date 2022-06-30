@@ -158,21 +158,26 @@ async function transfer() {
       transferableToken = await kit.contracts.getGoldToken()
     }
 
-
-
     const sourceAddress = getSourceAddress()
-    const sourceStableTokenBalance = await transferableToken.balanceOf(sourceAddress)
+    const sourceTokenBalance = await transferableToken.balanceOf(sourceAddress)
     const targetAddress = getTargetAddress()
 
-    if (sourceStableTokenBalance.gt(MIN_STABLE_TOKEN_TRANSFER_AMOUNT)) {
+    // Check how much we can transfer (keep 1 CELO for gas if selling stable for CELO (burning)).
+    const amountToKeep = sellCELO ? new BigNumber('0') : new BigNumber('1e18')
+
+    const transferAmount = sourceTokenBalance.minus(amountToKeep)
+
+    if (transferAmount.gt(MIN_STABLE_TOKEN_TRANSFER_AMOUNT)) {
+      const tokenSymbol = await transferableToken.symbol()
       rootLogger.info({
-        transferableToken,
-        sourceStableTokenBalance,
+        tokenSymbol,
+        sourceTokenBalance,
+        transferAmount,
         sourceAddress,
         targetAddress,
-      }, `Transferring entire balance of ${transferableToken} from source to target`)
+      }, `Transferring from source to target`)
 
-      const transferReceipt = await transferableToken.transfer(targetAddress, sourceStableTokenBalance.toFixed()).sendAndWaitForReceipt()
+      const transferReceipt = await transferableToken.transfer(targetAddress, transferAmount.toFixed()).sendAndWaitForReceipt()
       const targetStableTokenBalance = await transferableToken.balanceOf(targetAddress)
       rootLogger.info({
         transferReceipt,
