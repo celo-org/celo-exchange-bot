@@ -2,20 +2,46 @@ import { EnvVar, fetchEnv, fetchEnvBigNumber, fetchEnvBigNumberOrDefault, fetchE
 import { rootLogger } from './logger'
 import { ContractKit, newKit } from '@celo/contractkit'
 import { AzureHSMWallet } from '@celo/wallet-hsm-azure'
+import { ensureLeading0x, isValidPrivateKey } from '@celo/utils/lib/address'
+import { LocalWallet } from '@celo/wallet-local'
 import { Block } from 'web3-eth'
 import BigNumber from 'bignumber.js'
+import fs from 'fs'
 
 const MIN_STABLE_TOKEN_TRANSFER_AMOUNT = new BigNumber('1e17')
 
 let kit: ContractKit
 
+function loadPrivateKey(privateKeyPath: string) : string {
+  const privateKey = fs.readFileSync(privateKeyPath).toString()
+  if (!isValidPrivateKey(ensureLeading0x(privateKey))) {
+    throw Error(`Invalid private key: ${privateKey}.`)
+  }
+  return privateKey
+}
+
+async function getWallet() {
+    const azureVaultName = fetchEnvOrDefault(EnvVar.AZURE_VAULT_NAME, '')
+    const useAzure: boolean = azureVaultName !== ''
+    if (useAzure) {
+      // Initialize an Azure HSM wallet.
+      const akvWallet = new AzureHSMWallet(azureVaultName)
+      await akvWallet.init()
+      return akvWallet
+    } else {
+      const localWallet = new LocalWallet()
+      const walletPriveKeyPath = fetchEnv(EnvVar.WALLET_PRIVATE_KEY_PATH)
+      const walletPrivateKey = loadPrivateKey(walletPriveKeyPath)
+      localWallet.addAccount(walletPrivateKey)
+      return localWallet
+    }
+}
+
 async function initializeKit() {
   if (kit === undefined) {
-    // Initialize wallet
-    const akvWallet = new AzureHSMWallet(fetchEnv(EnvVar.AZURE_VAULT_NAME))
-    await akvWallet.init()
+    const wallet = await getWallet()
 
-    kit = newKit(fetchEnv(EnvVar.CELO_PROVIDER), akvWallet)
+    kit = newKit(fetchEnv(EnvVar.CELO_PROVIDER), wallet)
     
     // Copied from @celo/cli/src/utils/helpers
     try {

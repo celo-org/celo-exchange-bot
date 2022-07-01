@@ -29,6 +29,10 @@ And when running outside an authenticated Azure container, also specify:
 - `AZURE_CLIENT_SECRET`
 - `AZURE_TENANT_ID`
 
+Local wallet environment variables (required if `AZURE_VAULT_NAME` is not set):
+
+- `WALLET_PRIVATE_KEY_PATH`: A path to a file containing the private key for `EXCHANGE_SOURCE_ADDRESS`.
+
 ## Dev
 
 To build:
