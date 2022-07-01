@@ -75,12 +75,14 @@ async function exchange() {
       
     }
 
+    const buyableAssetSymbol = await buyableAsset.symbol()
+    const soldableAssetSymbol = await soldableAsset.symbol()
 
     // Check how much we can exchange (keep 1 CELO for gas if selling CELO for stable (minting)).
     const amountToKeep = sellCELO ? new BigNumber('1e18') : new BigNumber('0')
     const availableBalance = (await soldableAsset.balanceOf(sourceAddress)).minus(amountToKeep)
     if (availableBalance.lte(new BigNumber(0))) {
-      rootLogger.warn({ soldableAsset, availableBalance }, "Insufficient available balance to exchange")
+      rootLogger.warn({ soldableAssetSymbol, availableBalance }, "Insufficient available balance to exchange")
       return
     }
 
@@ -140,7 +142,7 @@ async function exchange() {
       sellAmount,
       minStableTokenOut,
       quotedRate
-    }, `Exchange (${soldableAsset} for ${buyableAsset}) succeeded`)
+    }, `Exchange (${soldableAssetSymbol} for ${buyableAssetSymbol}) succeeded`)
   } catch (err) {
     rootLogger.error({ err }, "This exchange failed")
   }
