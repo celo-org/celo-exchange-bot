@@ -1,3 +1,8 @@
+
+---
+**IMPORTANT: This project is not currently being maintained. If you want to use please check and update dependencies to solve potential security vulneratibilites of old dependencies**
+---
+
 # CELO <-> stable token Exchange Bot
 
 Uses an Azure Key Vault HSM wallet to periodically exchange CELO for stable tokens (specifying a maximum amount, and minimum rate) using the Exchange smart contract and transfer the stable token to a target wallet address.
